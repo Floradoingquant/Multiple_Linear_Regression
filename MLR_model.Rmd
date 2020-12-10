@@ -1,0 +1,180 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+#Load Data
+```{r}
+data <- read.csv("Market_data2019.csv")
+```
+
+
+```{r}
+head(data)
+data = na.omit(data)
+data$ROE <-  as.numeric(gsub("[\\%,]", "", data$ROE))
+data$EPS_Growth <-  as.numeric(gsub("[\\%,]", "", data$EPS_Growth))
+data$Cost_of_Equity <-  as.numeric(gsub("[\\%,]", "", data$Cost_of_Equity))
+data$CEO_holding <-  as.numeric(gsub("[\\%,]", "", data$CEO_holding))
+data$Institutional_holding <-  as.numeric(gsub("[\\%,]", "", data$Institutional_holding))
+
+outliers <- boxplot(data$PE, plot=TRUE)$out
+data <- data[-which(data$PE %in% outliers),]
+dat=data
+```
+
+```{r}
+class(dat$Region) #Region is factor
+class(dat$Industry) #Industry is factor
+class(dat$Number_of_firms) #Integer
+```
+
+```{r}
+scatter.smooth(y=data$PE, x=data$Institutional_holding, main="Institutional holding ~ PE",xlab = "Institutional holding", ylab = "PE")  # scatterplot
+scatter.smooth(y=data$PE, x=data$ROE, main="ROE ~ PE",xlab = "ROE", ylab = "PE")  # scatterplot
+scatter.smooth(y=data$PE, x=data$EPS_Growth, main="EPS_Growth ~ PE",xlab = "EPS_Growth", ylab = "PE")  # scatterplot
+scatter.smooth(y=data$PE, x=data$PBV, main="PBV ~ PE",xlab = "PBV", ylab = "PE")  # scatterplot
+scatter.smooth(y=data$PE, x=data$PS, main="PS ~ PE",xlab = "PS", ylab = "PE")  # scatterplot
+scatter.smooth(y=data$PE, x=data$Beta, main="Beta ~ PE",xlab = "Beta", ylab = "PE")  # scatterplot
+scatter.smooth(y=data$PE, x=data$Cost_of_Equity, main="Cost_of_Equity ~ PE",xlab = "Cost_of_Equity", ylab = "PE")  # scatterplot
+scatter.smooth(y=data$PE, x=data$CEO_holding, main="CEO_holding ~ PE",xlab = "CEO_holding", ylab = "PE")  # scatterplot
+```
+
+
+```{r}
+library(e1071)
+par(mfrow=c(2, 2)) 
+
+plot(density(data$ROE), main="Density Plot: ROE", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$ROE), 2)))
+
+polygon(density(data$ROE), col="pink")
+
+plot(density(data$EPS_Growth), main="Density Plot: EPS Growth", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$EPS_Growth), 2)))
+
+polygon(density(data$EPS_Growth), col="pink")
+
+plot(density(data$Cost_of_Equity), main="Density Plot: Cost of equity", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$Cost_of_Equity), 2)))
+
+polygon(density(data$Cost_of_Equity), col="pink")
+
+plot(density(data$CEO_holding), main="Density Plot: CEO holding", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$CEO_holding), 2)))
+
+polygon(density(data$CEO_holding), col="pink")
+```
+
+
+```{r}
+par(mfrow=c(2, 2)) 
+
+plot(density(data$Institutional_holding), main="Density Plot: Institutional holding", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$Institutional_holding), 2)))
+
+polygon(density(data$Institutional_holding), col="pink")
+
+plot(density(data$PE), main="Density Plot: PE", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$PE), 2)))
+
+polygon(density(data$PE), col="pink")
+
+plot(density(data$PBV), main="Density Plot: PBV", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$PBV), 2)))
+
+polygon(density(data$PBV), col="pink") 
+
+plot(density(data$PS), main="Density Plot: PS", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(data$PS), 2)))
+
+polygon(density(data$PS), col="pink")
+```
+
+
+```{r}
+
+dat1 = data
+dat1$Industry = NULL
+dat1$Region = NULL
+cor(dat1)
+
+par(mfrow=c(1, 1)) 
+library(corrplot)
+res <- cor(dat1)
+round(res,2)
+corrplot(res, type = "upper", order = "hclust", tl.col = "black", tl.srt = 45)
+```
+
+
+```{r}
+linearMod <- lm(PE ~.-(Number_of_firms+Region+Industry)+as.factor(Region)+as.factor(Industry), data=dat)  # build linear regression model on full data
+summary(linearMod)
+```
+
+```{r}
+uPr <- lm(PE ~.-(Number_of_firms+Region+Industry)+as.factor(Region)+as.factor(Industry), data=dat) #unrestricted
+rPr <- lm(PE ~.-(Number_of_firms+Region+Industry)+as.factor(Industry), data=dat) #restricted
+
+#summary(uPr)
+#summary(rPr)
+
+#partial F-test
+anova(rPr,uPr) #anove(restricted model,unrestricted model)
+
+uPr <- lm(PE ~.-(Number_of_firms+Region+Industry)+as.factor(Region)+as.factor(Industry), data=dat) #unrestricted
+rPr <- lm(PE ~.-(Number_of_firms+Region+Industry)+as.factor(Region), data=dat) #restricted
+
+#summary(uPr)
+#summary(rPr)
+
+#partial F-test
+anova(rPr,uPr) #anove(restricted model,unrestricted model)
+```
+
+
+```{r}
+par(mfrow=c(2, 2))
+plot(linearMod)
+```
+
+```{r}
+car::vif(linearMod)
+```
+
+**Stepwise regression based on AIC **
+
+Backward elimination
+
+```{r}
+linearMod1 <- lm(PE ~.-(Number_of_firms+Region+Industry+Cost_of_Equity)+as.factor(Region)+as.factor(Industry), data=dat)  # build linear regression model on full data
+mPEB<-step(linearMod1, trace=0)   #to output only the final model insert argument trace=0
+summary(mPEB)
+```
+Forward selection
+
+```{r}
+null<-lm(PE~1, data=dat)
+full<-lm(PE ~.-(Number_of_firms+Region+Industry+Cost_of_Equity)+as.factor(Region)+as.factor(Industry), data=dat)
+mPEF<-step(null, scope=list(lower=null, upper=full),direction="forward")
+summary(mPEF)
+```
+
+**Best subsets**
+
+```{r}
+mBSPE<-leaps::regsubsets(PE~.-(Number_of_firms + Industry + Region + Cost_of_Equity),nvmax=11,data=dat)
+plot(mBSPE, scale="bic") #by default uses BIC; may use "adjr2"
+summary(mBSPE)
+```
+
+```{r}
+linearMod2 <- lm(formula = PE ~ PS + CEO_holding + Beta, data = dat)
+par(mfrow=c(2, 2))
+plot(linearMod)
+```
+
+```{r}
+car::crPlots(linearMod2, line=F, smooth=T)
+```
+
+```{r}
+library(ggplot2)
+ggplot(linearMod2, aes(seq_along(.cooksd), .cooksd)) +
+  geom_col()+
+  xlab("Observation number")+
+  ylab("Cook's D")
+```
+
+
